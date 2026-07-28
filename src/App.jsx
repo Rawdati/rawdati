@@ -1,7 +1,4 @@
-(No subject)
 
-omar abduaziz
-​You​
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './pages/Login'
