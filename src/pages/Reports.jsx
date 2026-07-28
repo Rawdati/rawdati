@@ -1,5 +1,5 @@
 
-‬ import { useEffect, useState } from 'react'
+import { useEffect, useState
 import { supabase } from '../supabaseClient'
 import { levelInfo, thisMonth } from '../levels'
 
