@@ -1,3 +1,7 @@
+(No subject)
+
+omar abduaziz
+​You​
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './pages/Login'
@@ -7,21 +11,23 @@ import Attendance from './pages/Attendance'
 import Teachers from './pages/Teachers'
 import Fees from './pages/Fees'
 import Programs from './pages/Programs'
+import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import KindergartenModal from './components/KindergartenModal'
 
 const NAV = [
-  { id: 'dashboard', label: 'لوحة التحكم' },
-  { id: 'children', label: 'الأطفال' },
-  { id: 'attendance', label: 'حضور الأطفال' },
-  { id: 'teachers', label: 'المعلمون' },
-  { id: 'fees', label: 'الرسوم' },
-  { id: 'programs', label: 'البرامج' },
-  { id: 'settings', label: 'الإعدادات' },
+  { id: 'dashboard', label: 'الرئيسية', icon: '🏠' },
+  { id: 'children', label: 'الأطفال', icon: '🧒' },
+  { id: 'attendance', label: 'الحضور', icon: '📋' },
+  { id: 'teachers', label: 'المعلمون', icon: '👩' },
+  { id: 'fees', label: 'الرسوم', icon: '💰' },
+  { id: 'programs', label: 'البرامج', icon: '📚' },
+  { id: 'reports', label: 'التقارير', icon: '📊' },
+  { id: 'settings', label: 'الإعدادات', icon: '⚙️' },
 ]
 
 export default function App() {
-  const [session, setSession] = useState(undefined) // undefined = loading
+  const [session, setSession] = useState(undefined)
   const [kindergartens, setKindergartens] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [tab, setTab] = useState('dashboard')
@@ -60,58 +66,45 @@ export default function App() {
   if (!ready) return <FullScreenLoader />
 
   const activeKg = kindergartens.find((k) => k.id === activeId)
-
   const pageProps = { kindergartenId: activeId, levelNames: activeKg?.level_names || {} }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <aside style={{
-        width: 240, flexShrink: 0, background: 'var(--teal-dark)', color: '#fff',
-        padding: 20, display: 'flex', flexDirection: 'column', gap: 24,
-      }}>
-        <button onClick={() => setKgModalOpen(true)} style={{
-          background: 'none', border: 'none', color: '#fff', textAlign: 'right',
-          display: 'flex', alignItems: 'center', gap: 10, padding: 0,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%', background: 'var(--gold)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, color: 'var(--teal-dark)',
-          }}>🏫</div>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <button onClick={() => setKgModalOpen(true)} className="sidebar-kg-btn">
+          <div className="kg-icon">🏫</div>
           <div style={{ minWidth: 0 }}>
-            <div className="disp" style={{ fontWeight: 800, fontSize: 17, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {activeKg?.name}
-            </div>
-            <div style={{ fontSize: 12, opacity: .7 }}>تبديل الروضة {kindergartens.length > 1 && `· ${kindergartens.length}`}</div>
+            <div className="disp kg-name">{activeKg?.name}</div>
+            <div className="kg-sub">تبديل الروضة {kindergartens.length > 1 && `· ${kindergartens.length}`}</div>
           </div>
         </button>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <nav className="sidebar-nav">
           {NAV.map((n) => (
-            <button key={n.id} onClick={() => setTab(n.id)} style={{
-              textAlign: 'right', padding: '10px 12px', borderRadius: 10, border: 'none',
-              background: tab === n.id ? 'rgba(255,255,255,0.14)' : 'transparent',
-              color: tab === n.id ? '#fff' : 'rgba(255,255,255,0.72)', fontWeight: 600, fontSize: 14,
-            }}>
-              {n.label}
+            <button key={n.id} onClick={() => setTab(n.id)} className={`sidebar-link ${tab === n.id ? 'active' : ''}`}>
+              <span>{n.icon}</span> {n.label}
             </button>
           ))}
         </nav>
 
-        <button onClick={() => supabase.auth.signOut()} style={{
-          marginTop: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)',
-          fontSize: 13, textAlign: 'right', padding: 0,
-        }}>
-          تسجيل الخروج
-        </button>
+        <button onClick={() => supabase.auth.signOut()} className="sidebar-logout">تسجيل الخروج</button>
       </aside>
 
-      <main style={{ flex: 1, padding: 28, maxWidth: '100%', overflowX: 'hidden' }}>
+      <div className="mobile-topbar">
+        <button onClick={() => setKgModalOpen(true)} className="mobile-kg-btn">
+          🏫 {activeKg?.name}
+        </button>
+        <button onClick={() => supabase.auth.signOut()} className="mobile-logout-btn">خروج</button>
+      </div>
+
+      <main className="main-content">
         {tab === 'dashboard' && <Dashboard {...pageProps} />}
         {tab === 'children' && <Children {...pageProps} />}
         {tab === 'attendance' && <Attendance {...pageProps} />}
         {tab === 'teachers' && <Teachers {...pageProps} />}
         {tab === 'fees' && <Fees {...pageProps} />}
         {tab === 'programs' && <Programs {...pageProps} />}
+        {tab === 'reports' && <Reports {...pageProps} />}
         {tab === 'settings' && (
           <Settings
             kindergarten={activeKg}
@@ -119,6 +112,15 @@ export default function App() {
           />
         )}
       </main>
+
+      <nav className="mobile-bottomnav">
+        {NAV.map((n) => (
+          <button key={n.id} onClick={() => setTab(n.id)} className={`mobile-nav-item ${tab === n.id ? 'active' : ''}`}>
+            <span className="mobile-nav-icon">{n.icon}</span>
+            <span className="mobile-nav-label">{n.label}</span>
+          </button>
+        ))}
+      </nav>
 
       {kgModalOpen && (
         <KindergartenModal
