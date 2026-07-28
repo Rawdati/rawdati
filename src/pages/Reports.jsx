@@ -1,8 +1,4 @@
 
-(No subject)
-
-omar abduaziz
-​You​
 ‬ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { levelInfo, thisMonth } from '../levels'
