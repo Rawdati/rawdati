@@ -2,8 +2,24 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { allLevels, levelInfo, todayISO } from '../levels'
 
+const REGISTRATION_PERIODS = {
+  monthly: 'شهري',
+  semester: 'فصلي',
+  yearly: 'سنوي',
+}
+
+const BUS_TYPES = {
+  none: 'بدون حافلة',
+  one_way: 'خط واحد',
+  two_way: 'خطين (ذهاب وعودة)',
+}
+
 function emptyChild() {
-  return { name: '', level: 'nursery', parent_name: '', phone: '', birth_date: '', join_date: todayISO(), notes: '' }
+  return {
+    name: '', level: 'nursery', parent_name: '', phone: '', birth_date: '',
+    join_date: todayISO(), notes: '',
+    registration_period: 'monthly', bus_type: 'none', bus_fee: '',
+  }
 }
 
 export default function Children({ kindergartenId, levelNames }) {
@@ -23,7 +39,11 @@ export default function Children({ kindergartenId, levelNames }) {
   useEffect(() => { if (kindergartenId) load() }, [kindergartenId])
 
   const save = async (form) => {
-    const payload = { ...form, kindergarten_id: kindergartenId }
+    const payload = {
+      ...form,
+      kindergarten_id: kindergartenId,
+      bus_fee: form.bus_fee === '' ? 0 : Number(form.bus_fee),
+    }
     if (form.id) {
       const { error } = await supabase.from('children').update(payload).eq('id', form.id)
       if (error) return alert(error.message)
@@ -82,6 +102,8 @@ export default function Children({ kindergartenId, levelNames }) {
                 <div style={{ fontSize: 13, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span>ولي الأمر: {c.parent_name || '—'}</span>
                   <span>الجوال: {c.phone || '—'}</span>
+                  <span>نوع التسجيل: {REGISTRATION_PERIODS[c.registration_period] || 'شهري'}</span>
+                  <span>الحافلة: {BUS_TYPES[c.bus_type] || 'بدون حافلة'}{c.bus_type && c.bus_type !== 'none' && c.bus_fee ? ` · ${c.bus_fee} ريال` : ''}</span>
                 </div>
               </div>
             )
@@ -112,8 +134,9 @@ export default function Children({ kindergartenId, levelNames }) {
 }
 
 function ChildForm({ child, levels, onCancel, onSave }) {
-  const [form, setForm] = useState(child)
+  const [form, setForm] = useState({ ...emptyDefaults(), ...child })
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
+
   return (
     <div className="modal-box" onClick={(e) => e.stopPropagation()}>
       <h3 className="disp" style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{form.id ? 'تعديل بيانات الطفل' : 'إضافة طفل جديد'}</h3>
@@ -134,6 +157,33 @@ function ChildForm({ child, levels, onCancel, onSave }) {
       <label style={{ fontSize: 13, fontWeight: 600 }}>تاريخ الميلاد
         <input className="input" type="date" value={form.birth_date || ''} onChange={set('birth_date')} style={{ marginTop: 4 }} />
       </label>
+      <label style={{ fontSize: 13, fontWeight: 600 }}>تاريخ الالتحاق
+        <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} style={{ marginTop: 4 }} />
+      </label>
+      <label style={{ fontSize: 13, fontWeight: 600 }}>نوع التسجيل
+        <select className="input" value={form.registration_period} onChange={set('registration_period')} style={{ marginTop: 4 }}>
+          {Object.entries(REGISTRATION_PERIODS).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+        {form.registration_period === 'monthly' && (
+          <span style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginTop: 4 }}>
+            سيُحسب تاريخ انتهاء الاشتراك تلقائيًا بعد 30 يومًا من تاريخ الالتحاق.
+          </span>
+        )}
+      </label>
+      <label style={{ fontSize: 13, fontWeight: 600 }}>الحافلة
+        <select className="input" value={form.bus_type} onChange={set('bus_type')} style={{ marginTop: 4 }}>
+          {Object.entries(BUS_TYPES).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+      </label>
+      {form.bus_type !== 'none' && (
+        <label style={{ fontSize: 13, fontWeight: 600 }}>رسوم الحافلة
+          <input className="input" type="number" min="0" value={form.bus_fee} onChange={set('bus_fee')} style={{ marginTop: 4 }} />
+        </label>
+      )}
       <label style={{ fontSize: 13, fontWeight: 600 }}>ملاحظات
         <textarea className="input" rows={2} value={form.notes} onChange={set('notes')} style={{ marginTop: 4 }} />
       </label>
@@ -143,4 +193,8 @@ function ChildForm({ child, levels, onCancel, onSave }) {
       </div>
     </div>
   )
+}
+
+function emptyDefaults() {
+  return { registration_period: 'monthly', bus_type: 'none', bus_fee: '' }
 }
