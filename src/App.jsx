@@ -24,6 +24,9 @@ const NAV = [
   { id: 'settings', label: 'الإعدادات', icon: '⚙️' },
 ]
 
+const REMINDER_KEY = 'rawdati_backup_reminder_dismissed_at'
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [kindergartens, setKindergartens] = useState([])
@@ -31,6 +34,7 @@ export default function App() {
   const [tab, setTab] = useState('dashboard')
   const [kgModalOpen, setKgModalOpen] = useState(false)
   const [ready, setReady] = useState(false)
+  const [showBackupReminder, setShowBackupReminder] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -59,6 +63,29 @@ export default function App() {
     if (session) loadKindergartens(session.user.id)
   }, [session, loadKindergartens])
 
+  useEffect(() => {
+    if (!ready) return
+    try {
+      const last = localStorage.getItem(REMINDER_KEY)
+      const now = Date.now()
+      if (!last || now - parseInt(last, 10) > WEEK_MS) {
+        setShowBackupReminder(true)
+      }
+    } catch (e) {
+      setShowBackupReminder(true)
+    }
+  }, [ready])
+
+  const dismissReminder = () => {
+    try { localStorage.setItem(REMINDER_KEY, Date.now().toString()) } catch (e) {}
+    setShowBackupReminder(false)
+  }
+
+  const goToBackupFromReminder = () => {
+    dismissReminder()
+    setTab('backup')
+  }
+
   if (session === undefined) return <FullScreenLoader />
   if (!session) return <Login />
   if (!ready) return <FullScreenLoader />
@@ -68,6 +95,29 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {showBackupReminder && (
+        <div style={{
+          position: 'fixed', top: 0, insetInline: 0, zIndex: 1000,
+          background: '#1F6B5C', color: '#fff', padding: '12px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 12, flexWrap: 'wrap', fontSize: 13, fontWeight: 600,
+        }}>
+          <span>💾 تذكير: مرّ أسبوع على آخر مرة — لا تنسَ تصدير نسخة احتياطية من بيانات روضتك.</span>
+          <button
+            onClick={goToBackupFromReminder}
+            style={{ background: '#fff', color: '#1F6B5C', border: 'none', borderRadius: 8, padding: '6px 14px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            الذهاب الآن
+          </button>
+          <button
+            onClick={dismissReminder}
+            style={{ background: 'transparent', color: '#fff', border: '1px solid #fff', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}
+          >
+            لاحقاً
+          </button>
+        </div>
+      )}
+
       <aside className="sidebar">
         <button onClick={() => setKgModalOpen(true)} className="sidebar-kg-btn">
           <div className="kg-icon">🏫</div>
