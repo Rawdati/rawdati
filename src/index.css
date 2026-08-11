@@ -1,13 +1,12 @@
-
 :root {
-  --ink: #20293A;
-  --paper: #F6F7F3;
+  --ink: #16202E;
+  --paper: #EDEFE6;
   --card: #FFFFFF;
-  --teal: #1D6E68;
-  --teal-dark: #134F4B;
-  --gold: #E8A23D;
-  --line: #E4E2D8;
-  --muted: #6C7280;
+  --teal: #0E5C55;
+  --teal-dark: #0A3B38;
+  --gold: #D98A1B;
+  --line: #CFCBB8;
+  --muted: #4B5468;
 }
 
 * { box-sizing: border-box; }
