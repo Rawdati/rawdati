@@ -8,6 +8,11 @@ const REGISTRATION_PERIODS = {
   yearly: 'سنوي',
 }
 
+const REGISTRATION_TYPES = {
+  personal: 'شخصي',
+  qurrah: 'قرة',
+}
+
 const BUS_TYPES = {
   none: 'بدون حافلة',
   one_way: 'خط واحد',
@@ -18,7 +23,8 @@ function emptyChild() {
   return {
     name: '', level: 'nursery', parent_name: '', phone: '', birth_date: '',
     join_date: todayISO(), notes: '',
-    registration_period: 'monthly', bus_type: 'none', bus_fee: '',
+    registration_period: 'monthly', registration_type: 'personal',
+    bus_type: 'none', bus_fee: '',
   }
 }
 
@@ -43,6 +49,7 @@ export default function Children({ kindergartenId, levelNames }) {
       ...form,
       kindergarten_id: kindergartenId,
       bus_fee: form.bus_fee === '' ? 0 : Number(form.bus_fee),
+      registration_type: form.registration_period === 'monthly' ? form.registration_type : null,
     }
     if (form.id) {
       const { error } = await supabase.from('children').update(payload).eq('id', form.id)
@@ -102,7 +109,10 @@ export default function Children({ kindergartenId, levelNames }) {
                 <div style={{ fontSize: 13, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <span>ولي الأمر: {c.parent_name || '—'}</span>
                   <span>الجوال: {c.phone || '—'}</span>
-                  <span>نوع التسجيل: {REGISTRATION_PERIODS[c.registration_period] || 'شهري'}</span>
+                  <span>
+                    مدة التسجيل: {REGISTRATION_PERIODS[c.registration_period] || 'شهري'}
+                    {c.registration_period === 'monthly' && c.registration_type ? ` · ${REGISTRATION_TYPES[c.registration_type]}` : ''}
+                  </span>
                   <span>الحافلة: {BUS_TYPES[c.bus_type] || 'بدون حافلة'}{c.bus_type && c.bus_type !== 'none' && c.bus_fee ? ` · ${c.bus_fee} ريال` : ''}</span>
                 </div>
               </div>
@@ -113,7 +123,7 @@ export default function Children({ kindergartenId, levelNames }) {
       )}
 
       {editing && (
-        <div className="modal-overlay" onClick={() => setEditing(null)}>
+        <div className="modal-overlay">
           <ChildForm child={editing} levels={levels} onCancel={() => setEditing(null)} onSave={save} />
         </div>
       )}
@@ -160,7 +170,7 @@ function ChildForm({ child, levels, onCancel, onSave }) {
       <label style={{ fontSize: 13, fontWeight: 600 }}>تاريخ الالتحاق
         <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} style={{ marginTop: 4 }} />
       </label>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>نوع التسجيل
+      <label style={{ fontSize: 13, fontWeight: 600 }}>مدة التسجيل
         <select className="input" value={form.registration_period} onChange={set('registration_period')} style={{ marginTop: 4 }}>
           {Object.entries(REGISTRATION_PERIODS).map(([key, label]) => (
             <option key={key} value={key}>{label}</option>
@@ -172,6 +182,15 @@ function ChildForm({ child, levels, onCancel, onSave }) {
           </span>
         )}
       </label>
+      {form.registration_period === 'monthly' && (
+        <label style={{ fontSize: 13, fontWeight: 600 }}>نوع التسجيل (شخصي / قرة)
+          <select className="input" value={form.registration_type} onChange={set('registration_type')} style={{ marginTop: 4 }}>
+            {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </label>
+      )}
       <label style={{ fontSize: 13, fontWeight: 600 }}>الحافلة
         <select className="input" value={form.bus_type} onChange={set('bus_type')} style={{ marginTop: 4 }}>
           {Object.entries(BUS_TYPES).map(([key, label]) => (
@@ -196,5 +215,5 @@ function ChildForm({ child, levels, onCancel, onSave }) {
 }
 
 function emptyDefaults() {
-  return { registration_period: 'monthly', bus_type: 'none', bus_fee: '' }
+  return { registration_period: 'monthly', registration_type: 'personal', bus_type: 'none', bus_fee: '' }
 }
