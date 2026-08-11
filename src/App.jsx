@@ -10,6 +10,7 @@ import Programs from './pages/Programs'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Backup from './pages/Backup'
+import Subscriptions from './pages/Subscriptions'
 import KindergartenModal from './components/KindergartenModal'
 
 const NAV = [
@@ -18,6 +19,7 @@ const NAV = [
   { id: 'attendance', label: 'الحضور', icon: '📋' },
   { id: 'teachers', label: 'المعلمون', icon: '👩' },
   { id: 'fees', label: 'الرسوم', icon: '💰' },
+  { id: 'subscriptions', label: 'ملخص الاشتراكات', icon: '🗓️' },
   { id: 'programs', label: 'البرامج', icon: '📚' },
   { id: 'reports', label: 'التقارير', icon: '📊' },
   { id: 'backup', label: 'النسخ الاحتياطي', icon: '💾' },
@@ -151,6 +153,7 @@ export default function App() {
         {tab === 'attendance' && <Attendance {...pageProps} />}
         {tab === 'teachers' && <Teachers {...pageProps} />}
         {tab === 'fees' && <Fees {...pageProps} />}
+        {tab === 'subscriptions' && <Subscriptions {...pageProps} />}
         {tab === 'programs' && <Programs {...pageProps} />}
         {tab === 'reports' && <Reports {...pageProps} />}
         {tab === 'backup' && <Backup kindergartenId={activeId} kindergartenName={activeKg?.name} />}
