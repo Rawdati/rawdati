@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './pages/Login'
@@ -10,6 +9,7 @@ import Fees from './pages/Fees'
 import Programs from './pages/Programs'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import Backup from './pages/Backup'
 import KindergartenModal from './components/KindergartenModal'
 
 const NAV = [
@@ -20,6 +20,7 @@ const NAV = [
   { id: 'fees', label: 'الرسوم', icon: '💰' },
   { id: 'programs', label: 'البرامج', icon: '📚' },
   { id: 'reports', label: 'التقارير', icon: '📊' },
+  { id: 'backup', label: 'النسخ الاحتياطي', icon: '💾' },
   { id: 'settings', label: 'الإعدادات', icon: '⚙️' },
 ]
 
@@ -102,6 +103,7 @@ export default function App() {
         {tab === 'fees' && <Fees {...pageProps} />}
         {tab === 'programs' && <Programs {...pageProps} />}
         {tab === 'reports' && <Reports {...pageProps} />}
+        {tab === 'backup' && <Backup kindergartenId={activeId} kindergartenName={activeKg?.name} />}
         {tab === 'settings' && (
           <Settings
             kindergarten={activeKg}
