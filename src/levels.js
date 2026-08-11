@@ -1,8 +1,8 @@
 export const LEVELS = [
-  { id: 'nursery', color: '#E8A23D', tint: '#FBEBD3' },
-  { id: 'kg1', color: '#4E9C8F', tint: '#DCEEEA' },
-  { id: 'kg2', color: '#4C7FB0', tint: '#DCE7F2' },
-  { id: 'kg3', color: '#9B6FA8', tint: '#EBE0EF' },
+  { id: 'nursery', color: '#B5691A', tint: '#F3D9A8' },
+  { id: 'kg1', color: '#0E5C55', tint: '#A9D6CD' },
+  { id: 'kg2', color: '#1E4E7A', tint: '#B4CEE6' },
+  { id: 'kg3', color: '#6B3E78', tint: '#D6C0DE' },
 ]
 
 export const DEFAULT_LEVEL_NAMES = {
