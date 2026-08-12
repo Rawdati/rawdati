@@ -21,10 +21,10 @@ const BUS_TYPES = {
 
 function emptyChild() {
   return {
-    name: '', level: 'nursery', parent_name: '', phone: '', birth_date: '',
-    join_date: todayISO(), notes: '',
-    registration_period: 'monthly', registration_type: 'personal',
-    bus_type: 'none', bus_fee: '',
+    name: '', level: '', parent_name: '', phone: '', birth_date: '',
+    join_date: '', notes: '',
+    registration_period: '', registration_type: '',
+    bus_type: '', bus_fee: '',
   }
 }
 
@@ -121,10 +121,10 @@ export default function Children({ kindergartenId, levelNames }) {
                   <span>ولي الأمر: {c.parent_name || '—'}</span>
                   <span>الجوال: {c.phone || '—'}</span>
                   <span>
-                    مدة التسجيل: {REGISTRATION_PERIODS[c.registration_period] || 'شهري'}
+                    مدة التسجيل: {REGISTRATION_PERIODS[c.registration_period] || '—'}
                     {c.registration_period === 'monthly' && c.registration_type ? ` · ${REGISTRATION_TYPES[c.registration_type]}` : ''}
                   </span>
-                  <span>الحافلة: {BUS_TYPES[c.bus_type] || 'بدون حافلة'}{c.bus_type && c.bus_type !== 'none' && c.bus_fee ? ` · ${c.bus_fee} ريال` : ''}</span>
+                  <span>الحافلة: {BUS_TYPES[c.bus_type] || '—'}{c.bus_type && c.bus_type !== 'none' && c.bus_fee ? ` · ${c.bus_fee} ريال` : ''}</span>
                 </div>
               </div>
             )
@@ -181,7 +181,7 @@ function Field({ label, hint, full, error, children }) {
 }
 
 function ChildForm({ child, levels, onCancel, onSave }) {
-  const [form, setForm] = useState({ ...emptyDefaults(), ...child })
+  const [form, setForm] = useState({ ...child })
   const [errors, setErrors] = useState({})
   const set = (k) => (e) => {
     setForm({ ...form, [k]: e.target.value })
@@ -191,6 +191,16 @@ function ChildForm({ child, levels, onCancel, onSave }) {
   const handleSave = () => {
     const newErrors = {}
     if (!form.name.trim()) newErrors.name = 'اسم الطفل مطلوب'
+    if (!form.level) newErrors.level = 'المستوى مطلوب'
+    if (!form.parent_name || !form.parent_name.trim()) newErrors.parent_name = 'اسم ولي الأمر مطلوب'
+    if (!form.phone || !form.phone.trim()) newErrors.phone = 'رقم الجوال مطلوب'
+    if (!form.birth_date) newErrors.birth_date = 'تاريخ الميلاد مطلوب'
+    if (!form.join_date) newErrors.join_date = 'تاريخ الالتحاق مطلوب'
+    if (!form.registration_period) newErrors.registration_period = 'مدة التسجيل مطلوبة'
+    if (form.registration_period === 'monthly' && !form.registration_type) newErrors.registration_type = 'نوع التسجيل مطلوب'
+    if (!form.bus_type) newErrors.bus_type = 'الحافلة مطلوبة'
+    if (form.bus_type && form.bus_type !== 'none' && form.bus_fee === '') newErrors.bus_fee = 'رسوم الحافلة مطلوبة'
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
       return
@@ -206,7 +216,7 @@ function ChildForm({ child, levels, onCancel, onSave }) {
         <h3 className="disp" style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
           {form.id ? 'تعديل بيانات الطفل' : 'إضافة طفل جديد'}
         </h3>
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>الحقول المطلوبة فقط: الاسم</span>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>كل الحقول مطلوبة ما عدا الملاحظات</span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
@@ -214,35 +224,38 @@ function ChildForm({ child, levels, onCancel, onSave }) {
           <input className="input" value={form.name} onChange={set('name')} placeholder="مثال: أحمد محمد" style={inputStyle('name')} />
         </Field>
 
-        <Field label="المستوى">
-          <select className="input" value={form.level} onChange={set('level')}>
+        <Field label="المستوى" error={errors.level}>
+          <select className="input" value={form.level} onChange={set('level')} style={inputStyle('level')}>
+            <option value="">-- اختر --</option>
             {levels.map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}
           </select>
         </Field>
 
-        <Field label="تاريخ الميلاد">
-          <input className="input" type="date" value={form.birth_date || ''} onChange={set('birth_date')} />
+        <Field label="تاريخ الميلاد" error={errors.birth_date}>
+          <input className="input" type="date" value={form.birth_date || ''} onChange={set('birth_date')} style={inputStyle('birth_date')} />
         </Field>
 
-        <Field label="اسم ولي الأمر">
-          <input className="input" value={form.parent_name} onChange={set('parent_name')} />
+        <Field label="اسم ولي الأمر" error={errors.parent_name}>
+          <input className="input" value={form.parent_name} onChange={set('parent_name')} style={inputStyle('parent_name')} />
         </Field>
 
-        <Field label="رقم الجوال">
-          <input className="input" type="tel" value={form.phone} onChange={set('phone')} placeholder="05xxxxxxxx" />
+        <Field label="رقم الجوال" error={errors.phone}>
+          <input className="input" type="tel" value={form.phone} onChange={set('phone')} placeholder="05xxxxxxxx" style={inputStyle('phone')} />
         </Field>
 
         <div style={{ gridColumn: '1 / -1', height: 1, background: 'var(--line)', margin: '4px 0' }} />
 
-        <Field label="تاريخ الالتحاق">
-          <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} />
+        <Field label="تاريخ الالتحاق" error={errors.join_date}>
+          <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} style={inputStyle('join_date')} />
         </Field>
 
         <Field
           label="مدة التسجيل"
-          hint={form.registration_period === 'monthly' ? 'سيُحسب تاريخ انتهاء الاشتراك تلقائيًا بعد 30 يومًا من تاريخ الالتحاق.' : null}
+          error={errors.registration_period}
+          hint={!errors.registration_period && form.registration_period === 'monthly' ? 'سيُحسب تاريخ انتهاء الاشتراك تلقائيًا بعد 30 يومًا من تاريخ الالتحاق.' : null}
         >
-          <select className="input" value={form.registration_period} onChange={set('registration_period')}>
+          <select className="input" value={form.registration_period} onChange={set('registration_period')} style={inputStyle('registration_period')}>
+            <option value="">-- اختر --</option>
             {Object.entries(REGISTRATION_PERIODS).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
@@ -250,8 +263,9 @@ function ChildForm({ child, levels, onCancel, onSave }) {
         </Field>
 
         {form.registration_period === 'monthly' && (
-          <Field label="نوع التسجيل (شخصي / قرة)">
-            <select className="input" value={form.registration_type} onChange={set('registration_type')}>
+          <Field label="نوع التسجيل (شخصي / قرة)" error={errors.registration_type}>
+            <select className="input" value={form.registration_type} onChange={set('registration_type')} style={inputStyle('registration_type')}>
+              <option value="">-- اختر --</option>
               {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
               ))}
@@ -259,22 +273,23 @@ function ChildForm({ child, levels, onCancel, onSave }) {
           </Field>
         )}
 
-        <Field label="الحافلة">
-          <select className="input" value={form.bus_type} onChange={set('bus_type')}>
+        <Field label="الحافلة" error={errors.bus_type}>
+          <select className="input" value={form.bus_type} onChange={set('bus_type')} style={inputStyle('bus_type')}>
+            <option value="">-- اختر --</option>
             {Object.entries(BUS_TYPES).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
         </Field>
 
-        {form.bus_type !== 'none' && (
-          <Field label="رسوم الحافلة">
-            <input className="input" type="number" min="0" placeholder="0" value={form.bus_fee} onChange={set('bus_fee')} />
+        {form.bus_type && form.bus_type !== 'none' && (
+          <Field label="رسوم الحافلة" error={errors.bus_fee}>
+            <input className="input" type="number" min="0" placeholder="0" value={form.bus_fee} onChange={set('bus_fee')} style={inputStyle('bus_fee')} />
           </Field>
         )}
 
-        <Field label="ملاحظات" full>
-          <textarea className="input" rows={2} value={form.notes} onChange={set('notes')} placeholder="أي ملاحظات إضافية (اختياري)" />
+        <Field label="ملاحظات (اختياري)" full>
+          <textarea className="input" rows={2} value={form.notes} onChange={set('notes')} placeholder="أي ملاحظات إضافية" />
         </Field>
       </div>
 
@@ -284,8 +299,4 @@ function ChildForm({ child, levels, onCancel, onSave }) {
       </div>
     </div>
   )
-}
-
-function emptyDefaults() {
-  return { registration_period: 'monthly', registration_type: 'personal', bus_type: 'none', bus_fee: '' }
 }
