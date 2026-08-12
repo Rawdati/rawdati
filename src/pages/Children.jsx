@@ -143,77 +143,52 @@ export default function Children({ kindergartenId, levelNames }) {
   )
 }
 
+function Field({ label, hint, full, children }) {
+  return (
+    <label style={{ fontSize: 13, fontWeight: 600, display: 'flex', flexDirection: 'column', gap: 4, gridColumn: full ? '1 / -1' : 'auto' }}>
+      {label}
+      {children}
+      {hint && <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>{hint}</span>}
+    </label>
+  )
+}
+
 function ChildForm({ child, levels, onCancel, onSave }) {
   const [form, setForm] = useState({ ...emptyDefaults(), ...child })
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
 
   return (
-    <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-      <h3 className="disp" style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{form.id ? 'تعديل بيانات الطفل' : 'إضافة طفل جديد'}</h3>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>اسم الطفل
-        <input className="input" value={form.name} onChange={set('name')} style={{ marginTop: 4 }} />
-      </label>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>المستوى
-        <select className="input" value={form.level} onChange={set('level')} style={{ marginTop: 4 }}>
-          {levels.map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}
-        </select>
-      </label>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>اسم ولي الأمر
-        <input className="input" value={form.parent_name} onChange={set('parent_name')} style={{ marginTop: 4 }} />
-      </label>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>رقم الجوال
-        <input className="input" value={form.phone} onChange={set('phone')} style={{ marginTop: 4 }} />
-      </label>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>تاريخ الميلاد
-        <input className="input" type="date" value={form.birth_date || ''} onChange={set('birth_date')} style={{ marginTop: 4 }} />
-      </label>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>تاريخ الالتحاق
-        <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} style={{ marginTop: 4 }} />
-      </label>
-      <label style={{ fontSize: 13, fontWeight: 600 }}>مدة التسجيل
-        <select className="input" value={form.registration_period} onChange={set('registration_period')} style={{ marginTop: 4 }}>
-          {Object.entries(REGISTRATION_PERIODS).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
-        {form.registration_period === 'monthly' && (
-          <span style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginTop: 4 }}>
-            سيُحسب تاريخ انتهاء الاشتراك تلقائيًا بعد 30 يومًا من تاريخ الالتحاق.
-          </span>
-        )}
-      </label>
-      {form.registration_period === 'monthly' && (
-        <label style={{ fontSize: 13, fontWeight: 600 }}>نوع التسجيل (شخصي / قرة)
-          <select className="input" value={form.registration_type} onChange={set('registration_type')} style={{ marginTop: 4 }}>
-            {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      <label style={{ fontSize: 13, fontWeight: 600 }}>الحافلة
-        <select className="input" value={form.bus_type} onChange={set('bus_type')} style={{ marginTop: 4 }}>
-          {Object.entries(BUS_TYPES).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
-      </label>
-      {form.bus_type !== 'none' && (
-        <label style={{ fontSize: 13, fontWeight: 600 }}>رسوم الحافلة
-          <input className="input" type="number" min="0" value={form.bus_fee} onChange={set('bus_fee')} style={{ marginTop: 4 }} />
-        </label>
-      )}
-      <label style={{ fontSize: 13, fontWeight: 600 }}>ملاحظات
-        <textarea className="input" rows={2} value={form.notes} onChange={set('notes')} style={{ marginTop: 4 }} />
-      </label>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button className="btn btn-ghost" onClick={onCancel}>إلغاء</button>
-        <button className="btn btn-primary" onClick={() => form.name.trim() && onSave(form)}>حفظ</button>
+    <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h3 className="disp" style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
+          {form.id ? 'تعديل بيانات الطفل' : 'إضافة طفل جديد'}
+        </h3>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>الحقول المطلوبة فقط: الاسم</span>
       </div>
-    </div>
-  )
-}
 
-function emptyDefaults() {
-  return { registration_period: 'monthly', registration_type: 'personal', bus_type: 'none', bus_fee: '' }
-}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+        <Field label="اسم الطفل" full>
+          <input className="input" value={form.name} onChange={set('name')} placeholder="مثال: أحمد محمد" />
+        </Field>
+
+        <Field label="المستوى">
+          <select className="input" value={form.level} onChange={set('level')}>
+            {levels.map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}
+          </select>
+        </Field>
+
+        <Field label="تاريخ الميلاد">
+          <input className="input" type="date" value={form.birth_date || ''} onChange={set('birth_date')} />
+        </Field>
+
+        <Field label="اسم ولي الأمر">
+          <input className="input" value={form.parent_name} onChange={set('parent_name')} placeholder="اسم ولي الأمر" />
+        </Field>
+
+        <Field label="رقم الجوال">
+          <input className="input" type="tel" value={form.phone} onChange={set('phone')} placeholder="05xxxxxxxx" />
+        </Field>
+
+        <div style={{ gridColumn: '1 / -1', height: 1, background: 'var(--line)', margin: '4px 0' }} />
+
+        <Field label="تاريخ الالتحاق">
