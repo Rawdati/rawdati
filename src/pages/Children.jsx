@@ -34,6 +34,7 @@ export default function Children({ kindergartenId, levelNames }) {
   const [editing, setEditing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [query, setQuery] = useState('')
+  const [toast, setToast] = useState(null)
 
   const load = async () => {
     setLoading(true)
@@ -43,6 +44,12 @@ export default function Children({ kindergartenId, levelNames }) {
   }
 
   useEffect(() => { if (kindergartenId) load() }, [kindergartenId])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2500)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const save = async (form) => {
     const payload = {
@@ -59,6 +66,7 @@ export default function Children({ kindergartenId, levelNames }) {
       if (error) return alert(error.message)
     }
     setEditing(null)
+    setToast(form.id ? 'تم حفظ التعديلات بنجاح' : 'تم إضافة الطفل بنجاح')
     load()
   }
 
@@ -66,6 +74,7 @@ export default function Children({ kindergartenId, levelNames }) {
     const { error } = await supabase.from('children').delete().eq('id', id)
     if (error) return alert(error.message)
     setConfirmDelete(null)
+    setToast('تم حذف الطفل')
     load()
   }
 
@@ -139,23 +148,55 @@ export default function Children({ kindergartenId, levelNames }) {
           </div>
         </div>
       )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, insetInlineStart: '50%', transform: 'translateX(-50%)',
+          background: '#1F6B5C', color: '#fff', padding: '10px 20px', borderRadius: 10,
+          fontSize: 13, fontWeight: 700, zIndex: 200, boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+        }}>
+          ✓ {toast}
+        </div>
+      )}
     </div>
   )
 }
 
-function Field({ label, hint, full, children }) {
+function Field({ label, hint, full, error, children }) {
   return (
     <label style={{ fontSize: 13, fontWeight: 600, display: 'flex', flexDirection: 'column', gap: 4, gridColumn: full ? '1 / -1' : 'auto' }}>
-      {label}
+      <span style={{ color: error ? '#C1524A' : 'inherit' }}>
+        {label}{error && ' *'}
+      </span>
       {children}
-      {hint && <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>{hint}</span>}
+      {error ? (
+        <span style={{ fontSize: 11.5, color: '#C1524A', fontWeight: 600 }}>{error}</span>
+      ) : hint ? (
+        <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>{hint}</span>
+      ) : null}
     </label>
   )
 }
 
 function ChildForm({ child, levels, onCancel, onSave }) {
   const [form, setForm] = useState({ ...emptyDefaults(), ...child })
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
+  const [errors, setErrors] = useState({})
+  const set = (k) => (e) => {
+    setForm({ ...form, [k]: e.target.value })
+    if (errors[k]) setErrors({ ...errors, [k]: null })
+  }
+
+  const handleSave = () => {
+    const newErrors = {}
+    if (!form.name.trim()) newErrors.name = 'اسم الطفل مطلوب'
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+    onSave(form)
+  }
+
+  const inputStyle = (field) => errors[field] ? { borderColor: '#C1524A', background: '#FCEBEA' } : {}
 
   return (
     <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
@@ -167,8 +208,8 @@ function ChildForm({ child, levels, onCancel, onSave }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-        <Field label="اسم الطفل" full>
-          <input className="input" value={form.name} onChange={set('name')} placeholder="مثال: أحمد محمد" />
+        <Field label="اسم الطفل" full error={errors.name}>
+          <input className="input" value={form.name} onChange={set('name')} placeholder="مثال: أحمد محمد" style={inputStyle('name')} />
         </Field>
 
         <Field label="المستوى">
@@ -237,7 +278,7 @@ function ChildForm({ child, levels, onCancel, onSave }) {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
         <button className="btn btn-ghost" onClick={onCancel}>إلغاء</button>
-        <button className="btn btn-primary" onClick={() => form.name.trim() && onSave(form)}>حفظ</button>
+        <button className="btn btn-primary" onClick={handleSave}>حفظ</button>
       </div>
     </div>
   )
