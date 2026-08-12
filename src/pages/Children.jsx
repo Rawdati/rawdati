@@ -57,6 +57,8 @@ export default function Children({ kindergartenId, levelNames }) {
       kindergarten_id: kindergartenId,
       bus_fee: form.bus_fee === '' ? 0 : Number(form.bus_fee),
       registration_type: form.registration_period === 'monthly' ? form.registration_type : null,
+      birth_date: form.birth_date || null,
+      join_date: form.join_date || null,
     }
     if (form.id) {
       const { error } = await supabase.from('children').update(payload).eq('id', form.id)
@@ -223,7 +225,7 @@ function ChildForm({ child, levels, onCancel, onSave }) {
         </Field>
 
         <Field label="اسم ولي الأمر">
-          <input className="input" value={form.parent_name} onChange={set('parent_name')} placeholder="اسم ولي الأمر" />
+          <input className="input" value={form.parent_name} onChange={set('parent_name')} />
         </Field>
 
         <Field label="رقم الجوال">
