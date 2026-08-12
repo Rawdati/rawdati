@@ -192,3 +192,57 @@ function ChildForm({ child, levels, onCancel, onSave }) {
         <div style={{ gridColumn: '1 / -1', height: 1, background: 'var(--line)', margin: '4px 0' }} />
 
         <Field label="تاريخ الالتحاق">
+          <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} />
+        </Field>
+
+        <Field
+          label="مدة التسجيل"
+          hint={form.registration_period === 'monthly' ? 'سيُحسب تاريخ انتهاء الاشتراك تلقائيًا بعد 30 يومًا من تاريخ الالتحاق.' : null}
+        >
+          <select className="input" value={form.registration_period} onChange={set('registration_period')}>
+            {Object.entries(REGISTRATION_PERIODS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </Field>
+
+        {form.registration_period === 'monthly' && (
+          <Field label="نوع التسجيل (شخصي / قرة)">
+            <select className="input" value={form.registration_type} onChange={set('registration_type')}>
+              {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        <Field label="الحافلة">
+          <select className="input" value={form.bus_type} onChange={set('bus_type')}>
+            {Object.entries(BUS_TYPES).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </Field>
+
+        {form.bus_type !== 'none' && (
+          <Field label="رسوم الحافلة">
+            <input className="input" type="number" min="0" placeholder="0" value={form.bus_fee} onChange={set('bus_fee')} />
+          </Field>
+        )}
+
+        <Field label="ملاحظات" full>
+          <textarea className="input" rows={2} value={form.notes} onChange={set('notes')} placeholder="أي ملاحظات إضافية (اختياري)" />
+        </Field>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+        <button className="btn btn-ghost" onClick={onCancel}>إلغاء</button>
+        <button className="btn btn-primary" onClick={() => form.name.trim() && onSave(form)}>حفظ</button>
+      </div>
+    </div>
+  )
+}
+
+function emptyDefaults() {
+  return { registration_period: 'monthly', registration_type: 'personal', bus_type: 'none', bus_fee: '' }
+}
