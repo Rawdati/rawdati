@@ -1,203 +1,328 @@
-import { useEffect, useState, useCallback } from 'react'
-import { supabase } from './supabaseClient'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Children from './pages/Children'
-import Attendance from './pages/Attendance'
-import Teachers from './pages/Teachers'
-import Fees from './pages/Fees'
-import Programs from './pages/Programs'
-import Reports from './pages/Reports'
-import Settings from './pages/Settings'
-import Backup from './pages/Backup'
-import Subscriptions from './pages/Subscriptions'
-import KindergartenModal from './components/KindergartenModal'
+import { useEffect, useState } from 'react'
+import { supabase } from '../supabaseClient'
+import { allLevels, levelInfo, todayISO } from '../levels'
 
-const NAV = [
-  { id: 'dashboard', label: 'الرئيسية', icon: '🏠' },
-  { id: 'children', label: 'الأطفال', icon: '🧒' },
-  { id: 'attendance', label: 'الحضور', icon: '📋' },
-  { id: 'teachers', label: 'المعلمون', icon: '👩' },
-  { id: 'fees', label: 'الرسوم', icon: '💰' },
-  { id: 'subscriptions', label: 'ملخص الاشتراكات', icon: '🗓️' },
-  { id: 'programs', label: 'البرامج', icon: '📚' },
-  { id: 'reports', label: 'التقارير', icon: '📊' },
-  { id: 'backup', label: 'النسخ الاحتياطي', icon: '💾' },
-  { id: 'settings', label: 'الإعدادات', icon: '⚙️' },
-]
+const REGISTRATION_PERIODS = {
+  monthly: 'شهري',
+  semester: 'فصلي',
+  yearly: 'سنوي',
+}
 
-const REMINDER_KEY = 'rawdati_backup_reminder_dismissed_at'
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+const REGISTRATION_TYPES = {
+  personal: 'شخصي',
+  qurrah: 'قرة',
+}
 
-export default function App() {
-  const [session, setSession] = useState(undefined)
-  const [kindergartens, setKindergartens] = useState([])
-  const [activeId, setActiveId] = useState(null)
-  const [tab, setTab] = useState('dashboard')
-  const [kgModalOpen, setKgModalOpen] = useState(false)
-  const [ready, setReady] = useState(false)
-  const [showBackupReminder, setShowBackupReminder] = useState(false)
-  const [childrenLevelFilter, setChildrenLevelFilter] = useState(null)
+const BUS_TYPES = {
+  none: 'بدون حافلة',
+  one_way: 'خط واحد',
+  two_way: 'خطين (ذهاب وعودة)',
+}
+
+function emptyChild() {
+  return {
+    name: '', level: '', parent_name: '', phone: '', birth_date: '',
+    join_date: '', notes: '',
+    registration_period: '', registration_type: '',
+    bus_type: '', bus_fee: '',
+  }
+}
+
+export default function Children({ kindergartenId, levelNames, initialLevelFilter }) {
+  const [children, setChildren] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const [query, setQuery] = useState('')
+  const [levelFilter, setLevelFilter] = useState(initialLevelFilter || 'all')
+  const [toast, setToast] = useState(null)
+
+  const load = async () => {
+    setLoading(true)
+    const { data, error } = await supabase.from('children').select('*').eq('kindergarten_id', kindergartenId).order('name')
+    if (!error) setChildren(data)
+    setLoading(false)
+  }
+
+  useEffect(() => { if (kindergartenId) load() }, [kindergartenId])
+  useEffect(() => { if (initialLevelFilter) setLevelFilter(initialLevelFilter) }, [initialLevelFilter])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
-    return () => sub.subscription.unsubscribe()
-  }, [])
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2500)
+    return () => clearTimeout(t)
+  }, [toast])
 
-  const loadKindergartens = useCallback(async (userId) => {
-    let { data, error } = await supabase.from('kindergartens').select('*').order('created_at')
-    if (error) { console.error(error); return }
-    if (!data || data.length === 0) {
-      const { data: created, error: insErr } = await supabase
-        .from('kindergartens')
-        .insert({ owner_id: userId, name: 'الروضة الأولى' })
-        .select()
-        .single()
-      if (insErr) { console.error(insErr); return }
-      data = [created]
+  const save = async (form) => {
+    const payload = {
+      ...form,
+      kindergarten_id: kindergartenId,
+      bus_fee: form.bus_fee === '' ? 0 : Number(form.bus_fee),
+      registration_type: form.registration_period === 'monthly' ? form.registration_type : null,
+      birth_date: form.birth_date || null,
+      join_date: form.join_date || null,
     }
-    setKindergartens(data)
-    setActiveId((prev) => prev && data.find((k) => k.id === prev) ? prev : data[0].id)
-    setReady(true)
-  }, [])
-
-  useEffect(() => {
-    if (session) loadKindergartens(session.user.id)
-  }, [session, loadKindergartens])
-
-  useEffect(() => {
-    if (!ready) return
-    try {
-      const last = localStorage.getItem(REMINDER_KEY)
-      const now = Date.now()
-      if (!last || now - parseInt(last, 10) > WEEK_MS) {
-        setShowBackupReminder(true)
-      }
-    } catch (e) {
-      setShowBackupReminder(true)
+    if (form.id) {
+      const { error } = await supabase.from('children').update(payload).eq('id', form.id)
+      if (error) return alert(error.message)
+    } else {
+      const { error } = await supabase.from('children').insert(payload)
+      if (error) return alert(error.message)
     }
-  }, [ready])
-
-  const dismissReminder = () => {
-    try { localStorage.setItem(REMINDER_KEY, Date.now().toString()) } catch (e) {}
-    setShowBackupReminder(false)
+    setEditing(null)
+    setToast(form.id ? 'تم حفظ التعديلات بنجاح' : 'تم إضافة الطفل بنجاح')
+    load()
   }
 
-  const goToBackupFromReminder = () => {
-    dismissReminder()
-    setTab('backup')
+  const remove = async (id) => {
+    const { error } = await supabase.from('children').delete().eq('id', id)
+    if (error) return alert(error.message)
+    setConfirmDelete(null)
+    setToast('تم حذف الطفل')
+    load()
   }
 
-  const goToChildrenWithLevel = (levelId) => {
-    setChildrenLevelFilter(levelId)
-    setTab('children')
-  }
-
-  if (session === undefined) return <FullScreenLoader />
-  if (!session) return <Login />
-  if (!ready) return <FullScreenLoader />
-
-  const activeKg = kindergartens.find((k) => k.id === activeId)
-  const pageProps = { kindergartenId: activeId, levelNames: activeKg?.level_names || {} }
+  const levels = allLevels(levelNames)
+  const filtered = children
+    .filter((c) => levelFilter === 'all' || c.level === levelFilter)
+    .filter((c) => c.name.includes(query) || (c.parent_name || '').includes(query))
 
   return (
-    <div className="app-shell">
-      {showBackupReminder && (
-        <div style={{
-          position: 'fixed', top: 0, insetInline: 0, zIndex: 1000,
-          background: '#1F6B5C', color: '#fff', padding: '12px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 12, flexWrap: 'wrap', fontSize: 13, fontWeight: 600,
-        }}>
-          <span>💾 تذكير: مرّ أسبوع على آخر مرة — لا تنسَ تصدير نسخة احتياطية من بيانات روضتك.</span>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <h1 className="disp" style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>الأطفال</h1>
+          <p style={{ color: 'var(--muted)', fontSize: 13, margin: '4px 0 0' }}>{children.length} طفلًا مسجّلًا</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setEditing(emptyChild())}>+ إضافة طفل</button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+        <input className="input" placeholder="بحث بالاسم أو ولي الأمر" value={query}
+          onChange={(e) => setQuery(e.target.value)} style={{ maxWidth: 280 }} />
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <button
+          onClick={() => setLevelFilter('all')}
+          className="pill"
+          style={{ background: levelFilter === 'all' ? 'var(--teal)' : '#fff', color: levelFilter === 'all' ? '#fff' : 'var(--ink)', border: '1.5px solid var(--line)', cursor: 'pointer' }}
+        >
+          الكل
+        </button>
+        {levels.map((lv) => (
           <button
-            onClick={goToBackupFromReminder}
-            style={{ background: '#fff', color: '#1F6B5C', border: 'none', borderRadius: 8, padding: '6px 14px', fontWeight: 700, cursor: 'pointer' }}
+            key={lv.id}
+            onClick={() => setLevelFilter(lv.id)}
+            className="pill"
+            style={{ background: levelFilter === lv.id ? lv.color : lv.tint, color: levelFilter === lv.id ? '#fff' : lv.color, border: 'none', cursor: 'pointer' }}
           >
-            الذهاب الآن
+            {lv.name}
           </button>
-          <button
-            onClick={dismissReminder}
-            style={{ background: 'transparent', color: '#fff', border: '1px solid #fff', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}
-          >
-            لاحقاً
-          </button>
+        ))}
+      </div>
+
+      {loading ? <p>...جارٍ التحميل</p> : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+          {filtered.map((c) => {
+            const lv = levelInfo(c.level, levelNames)
+            return (
+              <div key={c.id} className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: lv.tint, color: lv.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                      {c.name.trim()[0]}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{c.name}</div>
+                      <span className="pill" style={{ background: lv.tint, color: lv.color }}>{lv.name}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => setEditing(c)} style={{ background: 'none', border: 'none' }}>✎</button>
+                    <button onClick={() => setConfirmDelete(c.id)} style={{ background: 'none', border: 'none', color: '#C1524A' }}>🗑</button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span>ولي الأمر: {c.parent_name || '—'}</span>
+                  <span>الجوال: {c.phone || '—'}</span>
+                  <span>
+                    مدة التسجيل: {REGISTRATION_PERIODS[c.registration_period] || '—'}
+                    {c.registration_period === 'monthly' && c.registration_type ? ` · ${REGISTRATION_TYPES[c.registration_type]}` : ''}
+                  </span>
+                  <span>الحافلة: {BUS_TYPES[c.bus_type] || '—'}{c.bus_type && c.bus_type !== 'none' && c.bus_fee ? ` · ${c.bus_fee} ريال` : ''}</span>
+                </div>
+              </div>
+            )
+          })}
+          {filtered.length === 0 && <p style={{ color: 'var(--muted)' }}>لا يوجد أطفال.</p>}
         </div>
       )}
 
-      <aside className="sidebar">
-        <button onClick={() => setKgModalOpen(true)} className="sidebar-kg-btn">
-          <div className="kg-icon">🏫</div>
-          <div style={{ minWidth: 0 }}>
-            <div className="disp kg-name">{activeKg?.name}</div>
-            <div className="kg-sub">تبديل الروضة {kindergartens.length > 1 && `· ${kindergartens.length}`}</div>
+      {editing && (
+        <div className="modal-overlay">
+          <ChildForm child={editing} levels={levels} onCancel={() => setEditing(null)} onSave={save} />
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="modal-box" style={{ maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
+            <p style={{ fontWeight: 600 }}>هل تريد حذف بيانات هذا الطفل؟</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn btn-ghost" onClick={() => setConfirmDelete(null)}>إلغاء</button>
+              <button className="btn btn-danger" onClick={() => remove(confirmDelete)}>حذف</button>
+            </div>
           </div>
-        </button>
+        </div>
+      )}
 
-        <nav className="sidebar-nav">
-          {NAV.map((n) => (
-            <button key={n.id} onClick={() => setTab(n.id)} className={`sidebar-link ${tab === n.id ? 'active' : ''}`}>
-              <span>{n.icon}</span> {n.label}
-            </button>
-          ))}
-        </nav>
-
-        <button onClick={() => supabase.auth.signOut()} className="sidebar-logout">تسجيل الخروج</button>
-      </aside>
-
-      <div className="mobile-topbar">
-        <button onClick={() => setKgModalOpen(true)} className="mobile-kg-btn">
-          🏫 {activeKg?.name}
-        </button>
-        <button onClick={() => supabase.auth.signOut()} className="mobile-logout-btn">خروج</button>
-      </div>
-
-      <main className="main-content">
-        {tab === 'dashboard' && <Dashboard {...pageProps} onGoToChildren={goToChildrenWithLevel} />}
-        {tab === 'children' && <Children {...pageProps} initialLevelFilter={childrenLevelFilter} />}
-        {tab === 'attendance' && <Attendance {...pageProps} />}
-        {tab === 'teachers' && <Teachers {...pageProps} />}
-        {tab === 'fees' && <Fees {...pageProps} />}
-        {tab === 'subscriptions' && <Subscriptions {...pageProps} />}
-        {tab === 'programs' && <Programs {...pageProps} />}
-        {tab === 'reports' && <Reports {...pageProps} />}
-        {tab === 'backup' && <Backup kindergartenId={activeId} kindergartenName={activeKg?.name} />}
-        {tab === 'settings' && (
-          <Settings
-            kindergarten={activeKg}
-            onUpdated={() => loadKindergartens(session.user.id)}
-          />
-        )}
-      </main>
-
-      <nav className="mobile-bottomnav">
-        {NAV.map((n) => (
-          <button key={n.id} onClick={() => setTab(n.id)} className={`mobile-nav-item ${tab === n.id ? 'active' : ''}`}>
-            <span className="mobile-nav-icon">{n.icon}</span>
-            <span className="mobile-nav-label">{n.label}</span>
-          </button>
-        ))}
-      </nav>
-
-      {kgModalOpen && (
-        <KindergartenModal
-          kindergartens={kindergartens}
-          activeId={activeId}
-          userId={session.user.id}
-          onClose={() => setKgModalOpen(false)}
-          onSwitch={(id) => { setActiveId(id); setKgModalOpen(false) }}
-          onChanged={() => loadKindergartens(session.user.id)}
-        />
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, insetInlineStart: '50%', transform: 'translateX(-50%)',
+          background: '#1F6B5C', color: '#fff', padding: '10px 20px', borderRadius: 10,
+          fontSize: 13, fontWeight: 700, zIndex: 200, boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+        }}>
+          ✓ {toast}
+        </div>
       )}
     </div>
   )
 }
 
-function FullScreenLoader() {
+function Field({ label, hint, full, error, children }) {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)' }}>
-      <div style={{ color: 'var(--teal)', fontWeight: 700 }}>...جارٍ التحميل</div>
+    <label style={{ fontSize: 13, fontWeight: 600, display: 'flex', flexDirection: 'column', gap: 4, gridColumn: full ? '1 / -1' : 'auto' }}>
+      <span style={{ color: error ? '#C1524A' : 'inherit' }}>
+        {label}{error && ' *'}
+      </span>
+      {children}
+      {error ? (
+        <span style={{ fontSize: 11.5, color: '#C1524A', fontWeight: 600 }}>{error}</span>
+      ) : hint ? (
+        <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>{hint}</span>
+      ) : null}
+    </label>
+  )
+}
+
+function ChildForm({ child, levels, onCancel, onSave }) {
+  const [form, setForm] = useState({ ...child })
+  const [errors, setErrors] = useState({})
+  const set = (k) => (e) => {
+    setForm({ ...form, [k]: e.target.value })
+    if (errors[k]) setErrors({ ...errors, [k]: null })
+  }
+
+  const handleSave = () => {
+    const newErrors = {}
+    if (!form.name.trim()) newErrors.name = 'اسم الطفل مطلوب'
+    if (!form.level) newErrors.level = 'المستوى مطلوب'
+    if (!form.parent_name || !form.parent_name.trim()) newErrors.parent_name = 'اسم ولي الأمر مطلوب'
+    if (!form.phone || !form.phone.trim()) newErrors.phone = 'رقم الجوال مطلوب'
+    if (!form.birth_date) newErrors.birth_date = 'تاريخ الميلاد مطلوب'
+    if (!form.join_date) newErrors.join_date = 'تاريخ الالتحاق مطلوب'
+    if (!form.registration_period) newErrors.registration_period = 'مدة التسجيل مطلوبة'
+    if (form.registration_period === 'monthly' && !form.registration_type) newErrors.registration_type = 'نوع التسجيل مطلوب'
+    if (!form.bus_type) newErrors.bus_type = 'الحافلة مطلوبة'
+    if (form.bus_type && form.bus_type !== 'none' && form.bus_fee === '') newErrors.bus_fee = 'رسوم الحافلة مطلوبة'
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+    onSave(form)
+  }
+
+  const inputStyle = (field) => errors[field] ? { borderColor: '#C1524A', background: '#FCEBEA' } : {}
+
+  return (
+    <div className="modal-box" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h3 className="disp" style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
+          {form.id ? 'تعديل بيانات الطفل' : 'إضافة طفل جديد'}
+        </h3>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>كل الحقول مطلوبة ما عدا الملاحظات</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+        <Field label="اسم الطفل" full error={errors.name}>
+          <input className="input" value={form.name} onChange={set('name')} placeholder="مثال: أحمد محمد" style={inputStyle('name')} />
+        </Field>
+
+        <Field label="المستوى" error={errors.level}>
+          <select className="input" value={form.level} onChange={set('level')} style={inputStyle('level')}>
+            <option value="">-- اختر --</option>
+            {levels.map((lv) => <option key={lv.id} value={lv.id}>{lv.name}</option>)}
+          </select>
+        </Field>
+
+        <Field label="تاريخ الميلاد" error={errors.birth_date}>
+          <input className="input" type="date" value={form.birth_date || ''} onChange={set('birth_date')} style={inputStyle('birth_date')} />
+        </Field>
+
+        <Field label="اسم ولي الأمر" error={errors.parent_name}>
+          <input className="input" value={form.parent_name} onChange={set('parent_name')} style={inputStyle('parent_name')} />
+        </Field>
+
+        <Field label="رقم الجوال" error={errors.phone}>
+          <input className="input" type="tel" value={form.phone} onChange={set('phone')} placeholder="05xxxxxxxx" style={inputStyle('phone')} />
+        </Field>
+
+        <div style={{ gridColumn: '1 / -1', height: 1, background: 'var(--line)', margin: '4px 0' }} />
+
+        <Field label="تاريخ الالتحاق" error={errors.join_date}>
+          <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} style={inputStyle('join_date')} />
+        </Field>
+
+        <Field
+          label="مدة التسجيل"
+          error={errors.registration_period}
+          hint={!errors.registration_period && form.registration_period === 'monthly' ? 'سيُحسب تاريخ انتهاء الاشتراك تلقائيًا بعد 30 يومًا من تاريخ الالتحاق.' : null}
+        >
+          <select className="input" value={form.registration_period} onChange={set('registration_period')} style={inputStyle('registration_period')}>
+            <option value="">-- اختر --</option>
+            {Object.entries(REGISTRATION_PERIODS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </Field>
+
+        {form.registration_period === 'monthly' && (
+          <Field label="نوع التسجيل (شخصي / قرة)" error={errors.registration_type}>
+            <select className="input" value={form.registration_type} onChange={set('registration_type')} style={inputStyle('registration_type')}>
+              <option value="">-- اختر --</option>
+              {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        <Field label="الحافلة" error={errors.bus_type}>
+          <select className="input" value={form.bus_type} onChange={set('bus_type')} style={inputStyle('bus_type')}>
+            <option value="">-- اختر --</option>
+            {Object.entries(BUS_TYPES).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </Field>
+
+        {form.bus_type && form.bus_type !== 'none' && (
+          <Field label="رسوم الحافلة" error={errors.bus_fee}>
+            <input className="input" type="number" min="0" placeholder="0" value={form.bus_fee} onChange={set('bus_fee')} style={inputStyle('bus_fee')} />
+          </Field>
+        )}
+
+        <Field label="ملاحظات (اختياري)" full>
+          <textarea className="input" rows={2} value={form.notes} onChange={set('notes')} placeholder="أي ملاحظات إضافية" />
+        </Field>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+        <button className="btn btn-ghost" onClick={onCancel}>إلغاء</button>
+        <button className="btn btn-primary" onClick={handleSave}>حفظ</button>
+      </div>
     </div>
   )
 }
