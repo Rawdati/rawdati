@@ -37,6 +37,7 @@ export default function App() {
   const [kgModalOpen, setKgModalOpen] = useState(false)
   const [ready, setReady] = useState(false)
   const [showBackupReminder, setShowBackupReminder] = useState(false)
+  const [childrenLevelFilter, setChildrenLevelFilter] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -86,6 +87,11 @@ export default function App() {
   const goToBackupFromReminder = () => {
     dismissReminder()
     setTab('backup')
+  }
+
+  const goToChildrenWithLevel = (levelId) => {
+    setChildrenLevelFilter(levelId)
+    setTab('children')
   }
 
   if (session === undefined) return <FullScreenLoader />
@@ -148,8 +154,8 @@ export default function App() {
       </div>
 
       <main className="main-content">
-        {tab === 'dashboard' && <Dashboard {...pageProps} />}
-        {tab === 'children' && <Children {...pageProps} />}
+        {tab === 'dashboard' && <Dashboard {...pageProps} onGoToChildren={goToChildrenWithLevel} />}
+        {tab === 'children' && <Children {...pageProps} initialLevelFilter={childrenLevelFilter} />}
         {tab === 'attendance' && <Attendance {...pageProps} />}
         {tab === 'teachers' && <Teachers {...pageProps} />}
         {tab === 'fees' && <Fees {...pageProps} />}
