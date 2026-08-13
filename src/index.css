@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
+
 :root {
   --ink: #16202E;
   --paper: #EDEFE6;
@@ -124,7 +126,14 @@ input, select, textarea { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; font-size: 16px;
 }
-.kg-name { font-weight: 800; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kg-name {
+  font-family: 'Amiri', serif;
+  font-weight: 700;
+  font-size: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .kg-sub { font-size: 12px; opacity: .7; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
 .sidebar-link {
@@ -162,8 +171,9 @@ input, select, textarea { font-family: inherit; }
     background: rgba(255,255,255,0.12);
     border: none;
     color: #fff;
+    font-family: 'Amiri', serif;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 17px;
     padding: 8px 14px;
     border-radius: 999px;
     max-width: 70%;
