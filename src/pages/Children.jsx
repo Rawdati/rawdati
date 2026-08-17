@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { allLevels, levelInfo, todayISO } from '../levels'
+import { allLevels, levelInfo, todayISO, thisMonth } from '../levels'
 
 const REGISTRATION_PERIODS = {
   monthly: 'شهري',
@@ -19,22 +19,28 @@ const BUS_TYPES = {
   two_way: 'خطين (ذهاب وعودة)',
 }
 
+const DISMISSAL_TIMES = {
+  '1': 'الواحدة',
+  '3': 'الثالثة',
+  '4': 'الرابعة',
+}
+
 function emptyChild() {
   return {
     name: '', level: '', parent_name: '', phone: '', birth_date: '',
     join_date: '', notes: '',
-    registration_period: '', registration_type: '',
-    bus_type: '', bus_fee: '',
+    registration_period: '', registration_type: '', dismissal_time: '',
+    bus_type: '',
   }
 }
 
-export default function Children({ kindergartenId, levelNames, initialLevelFilter }) {
+export default function Children({ kindergartenId, levelNames }) {
   const [children, setChildren] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [query, setQuery] = useState('')
-  const [levelFilter, setLevelFilter] = useState(initialLevelFilter || 'all')
+  const [levelFilter, setLevelFilter] = useState('all')
   const [toast, setToast] = useState(null)
 
   const load = async () => {
@@ -45,7 +51,6 @@ export default function Children({ kindergartenId, levelNames, initialLevelFilte
   }
 
   useEffect(() => { if (kindergartenId) load() }, [kindergartenId])
-  useEffect(() => { if (initialLevelFilter) setLevelFilter(initialLevelFilter) }, [initialLevelFilter])
 
   useEffect(() => {
     if (!toast) return
@@ -55,20 +60,43 @@ export default function Children({ kindergartenId, levelNames, initialLevelFilte
 
   const save = async (form) => {
     const payload = {
-      ...form,
-      kindergarten_id: kindergartenId,
-      bus_fee: form.bus_fee === '' ? 0 : Number(form.bus_fee),
-      registration_type: form.registration_period === 'monthly' ? form.registration_type : null,
+      name: form.name,
+      level: form.level,
+      parent_name: form.parent_name,
+      phone: form.phone,
       birth_date: form.birth_date || null,
       join_date: form.join_date || null,
+      notes: form.notes,
+      kindergarten_id: kindergartenId,
+      registration_period: form.registration_period,
+      registration_type: form.registration_period === 'monthly' ? form.registration_type : null,
+      dismissal_time: form.registration_period === 'monthly' ? form.dismissal_time : null,
+      bus_type: form.bus_type,
     }
+
+    let childId = form.id
     if (form.id) {
       const { error } = await supabase.from('children').update(payload).eq('id', form.id)
       if (error) return alert(error.message)
     } else {
-      const { error } = await supabase.from('children').insert(payload)
+      const { data, error } = await supabase.from('children').insert(payload).select('id').single()
       if (error) return alert(error.message)
+      childId = data.id
     }
+
+    try {
+      await supabase.rpc('register_child_fee', {
+        p_child_id: childId,
+        p_kindergarten_id: kindergartenId,
+        p_registration_period: form.registration_period,
+        p_dismissal_time: form.registration_period === 'monthly' ? form.dismissal_time : null,
+        p_bus_type: form.bus_type,
+        p_month: thisMonth(),
+      })
+    } catch (e) {
+      console.error('register_child_fee failed', e)
+    }
+
     setEditing(null)
     setToast(form.id ? 'تم حفظ التعديلات بنجاح' : 'تم إضافة الطفل بنجاح')
     load()
@@ -149,8 +177,9 @@ export default function Children({ kindergartenId, levelNames, initialLevelFilte
                   <span>
                     مدة التسجيل: {REGISTRATION_PERIODS[c.registration_period] || '—'}
                     {c.registration_period === 'monthly' && c.registration_type ? ` · ${REGISTRATION_TYPES[c.registration_type]}` : ''}
+                    {c.registration_period === 'monthly' && c.dismissal_time ? ` · انصراف ${DISMISSAL_TIMES[c.dismissal_time]}` : ''}
                   </span>
-                  <span>الحافلة: {BUS_TYPES[c.bus_type] || '—'}{c.bus_type && c.bus_type !== 'none' && c.bus_fee ? ` · ${c.bus_fee} ريال` : ''}</span>
+                  <span>الحافلة: {BUS_TYPES[c.bus_type] || '—'}</span>
                 </div>
               </div>
             )
@@ -224,8 +253,8 @@ function ChildForm({ child, levels, onCancel, onSave }) {
     if (!form.join_date) newErrors.join_date = 'تاريخ الالتحاق مطلوب'
     if (!form.registration_period) newErrors.registration_period = 'مدة التسجيل مطلوبة'
     if (form.registration_period === 'monthly' && !form.registration_type) newErrors.registration_type = 'نوع التسجيل مطلوب'
+    if (form.registration_period === 'monthly' && !form.dismissal_time) newErrors.dismissal_time = 'وقت الانصراف مطلوب'
     if (!form.bus_type) newErrors.bus_type = 'الحافلة مطلوبة'
-    if (form.bus_type && form.bus_type !== 'none' && form.bus_fee === '') newErrors.bus_fee = 'رسوم الحافلة مطلوبة'
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
@@ -275,11 +304,7 @@ function ChildForm({ child, levels, onCancel, onSave }) {
           <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} style={inputStyle('join_date')} />
         </Field>
 
-        <Field
-          label="مدة التسجيل"
-          error={errors.registration_period}
-          hint={!errors.registration_period && form.registration_period === 'monthly' ? 'سيُحسب تاريخ انتهاء الاشتراك تلقائيًا بعد 30 يومًا من تاريخ الالتحاق.' : null}
-        >
+        <Field label="مدة التسجيل" error={errors.registration_period}>
           <select className="input" value={form.registration_period} onChange={set('registration_period')} style={inputStyle('registration_period')}>
             <option value="">-- اختر --</option>
             {Object.entries(REGISTRATION_PERIODS).map(([key, label]) => (
@@ -289,14 +314,25 @@ function ChildForm({ child, levels, onCancel, onSave }) {
         </Field>
 
         {form.registration_period === 'monthly' && (
-          <Field label="نوع التسجيل (شخصي / قرة)" error={errors.registration_type}>
-            <select className="input" value={form.registration_type} onChange={set('registration_type')} style={inputStyle('registration_type')}>
-              <option value="">-- اختر --</option>
-              {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </Field>
+          <>
+            <Field label="نوع التسجيل (شخصي / قرة)" error={errors.registration_type}>
+              <select className="input" value={form.registration_type} onChange={set('registration_type')} style={inputStyle('registration_type')}>
+                <option value="">-- اختر --</option>
+                {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="وقت الانصراف" error={errors.dismissal_time}>
+              <select className="input" value={form.dismissal_time} onChange={set('dismissal_time')} style={inputStyle('dismissal_time')}>
+                <option value="">-- اختر --</option>
+                {Object.entries(DISMISSAL_TIMES).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </Field>
+          </>
         )}
 
         <Field label="الحافلة" error={errors.bus_type}>
@@ -307,12 +343,6 @@ function ChildForm({ child, levels, onCancel, onSave }) {
             ))}
           </select>
         </Field>
-
-        {form.bus_type && form.bus_type !== 'none' && (
-          <Field label="رسوم الحافلة" error={errors.bus_fee}>
-            <input className="input" type="number" min="0" placeholder="0" value={form.bus_fee} onChange={set('bus_fee')} style={inputStyle('bus_fee')} />
-          </Field>
-        )}
 
         <Field label="ملاحظات (اختياري)" full>
           <textarea className="input" rows={2} value={form.notes} onChange={set('notes')} placeholder="أي ملاحظات إضافية" />
