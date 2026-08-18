@@ -11,6 +11,13 @@ export default function Settings({ kindergarten, onUpdated }) {
   const [viewingArchive, setViewingArchive] = useState(null)
   const [children, setChildren] = useState([])
 
+  // --- دعوة موظف ---
+  const [invites, setInvites] = useState([])
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('staff')
+  const [inviteSaving, setInviteSaving] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+
   useEffect(() => {
     setName(kindergarten?.name || '')
     setLevelNames(kindergarten?.level_names || DEFAULT_LEVEL_NAMES)
@@ -23,6 +30,8 @@ export default function Settings({ kindergarten, onUpdated }) {
     setArchives(a || [])
     const { data: c } = await supabase.from('children').select('*').eq('kindergarten_id', kindergarten.id).order('name')
     setChildren(c || [])
+    const { data: inv } = await supabase.from('staff_invitations').select('*').eq('kindergarten_id', kindergarten.id).order('created_at', { ascending: false })
+    setInvites(inv || [])
   }
 
   const handleSave = async () => {
@@ -30,6 +39,35 @@ export default function Settings({ kindergarten, onUpdated }) {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
     onUpdated()
+  }
+
+  const handleInvite = async () => {
+    setInviteError('')
+    const email = inviteEmail.trim().toLowerCase()
+    if (!email || !email.includes('@')) {
+      setInviteError('الرجاء إدخال بريد إلكتروني صحيح')
+      return
+    }
+    setInviteSaving(true)
+    const { error } = await supabase.from('staff_invitations').insert({
+      kindergarten_id: kindergarten.id,
+      email,
+      role: inviteRole,
+    })
+    setInviteSaving(false)
+    if (error) {
+      if (error.code === '23505') setInviteError('تمت دعوة هذا البريد مسبقًا')
+      else setInviteError('حدث خطأ، حاول مرة أخرى')
+      return
+    }
+    setInviteEmail('')
+    setInviteRole('staff')
+    loadExtra()
+  }
+
+  const handleDeleteInvite = async (id) => {
+    await supabase.from('staff_invitations').delete().eq('id', id)
+    loadExtra()
   }
 
   const doArchive = async (label, continuingChildren) => {
@@ -93,6 +131,46 @@ export default function Settings({ kindergarten, onUpdated }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
         <button className="btn btn-primary" onClick={handleSave}>حفظ التغييرات</button>
         {saved && <span className="pill" style={{ background: '#DCEEEA', color: 'var(--teal-dark)' }}>تم الحفظ</span>}
+      </div>
+
+      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+        <h3 style={{ marginTop: 0 }}>دعوة موظف جديد</h3>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
+          أدخل بريد الموظف، وعند تسجيله لحساب بنفس البريد سيُربط تلقائيًا بالروضة والصلاحية المحددة.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            className="input"
+            style={{ flex: 1, minWidth: 220 }}
+            placeholder="بريد الموظف الإلكتروني"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+          />
+          <select className="input" style={{ width: 140 }} value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+            <option value="staff">موظف</option>
+            <option value="admin">مدير</option>
+          </select>
+          <button className="btn btn-primary" onClick={handleInvite} disabled={inviteSaving}>
+            {inviteSaving ? '...جارٍ الدعوة' : 'دعوة'}
+          </button>
+        </div>
+        {inviteError && <div style={{ color: '#C1524A', fontSize: 12, marginTop: 8 }}>{inviteError}</div>}
+
+        {invites.length > 0 && (
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {invites.map((inv) => (
+              <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 12, background: 'var(--paper)', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{inv.email}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    {inv.role === 'admin' ? 'مدير' : 'موظف'} — {inv.accepted_at ? 'مُفعّلة' : 'بانتظار التسجيل'}
+                  </div>
+                </div>
+                <button className="btn btn-ghost" onClick={() => handleDeleteInvite(inv.id)}>حذف</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ padding: 16 }}>
