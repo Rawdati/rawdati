@@ -96,10 +96,10 @@ export default function App() {
   const pageProps = { kindergartenId: activeId, levelNames: activeKg?.level_names || {} }
 
   return (
-    <div className="app-shell">
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {showBackupReminder && (
         <div style={{
-          position: 'fixed', top: 0, insetInline: 0, zIndex: 1000,
+          width: '100%', zIndex: 1000,
           background: '#1F6B5C', color: '#fff', padding: '12px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: 12, flexWrap: 'wrap', fontSize: 13, fontWeight: 600,
@@ -120,70 +120,72 @@ export default function App() {
         </div>
       )}
 
-      <aside className="sidebar">
-        <button onClick={() => setKgModalOpen(true)} className="sidebar-kg-btn">
-          <div className="kg-icon">🏫</div>
-          <div style={{ minWidth: 0 }}>
-            <div className="disp kg-name">{activeKg?.name}</div>
-            <div className="kg-sub">تبديل الروضة {kindergartens.length > 1 && `· ${kindergartens.length}`}</div>
-          </div>
-        </button>
+      <div className="app-shell" style={{ flex: 1, minHeight: 0 }}>
+        <aside className="sidebar">
+          <button onClick={() => setKgModalOpen(true)} className="sidebar-kg-btn">
+            <div className="kg-icon">🏫</div>
+            <div style={{ minWidth: 0 }}>
+              <div className="disp kg-name">{activeKg?.name}</div>
+              <div className="kg-sub">تبديل الروضة {kindergartens.length > 1 && `· ${kindergartens.length}`}</div>
+            </div>
+          </button>
 
-        <nav className="sidebar-nav">
+          <nav className="sidebar-nav">
+            {NAV.map((n) => (
+              <button key={n.id} onClick={() => setTab(n.id)} className={`sidebar-link ${tab === n.id ? 'active' : ''}`}>
+                <span>{n.icon}</span> {n.label}
+              </button>
+            ))}
+          </nav>
+
+          <button onClick={() => supabase.auth.signOut()} className="sidebar-logout">تسجيل الخروج</button>
+        </aside>
+
+        <div className="mobile-topbar">
+          <button onClick={() => setKgModalOpen(true)} className="mobile-kg-btn">
+            🏫 {activeKg?.name}
+          </button>
+          <button onClick={() => supabase.auth.signOut()} className="mobile-logout-btn">خروج</button>
+        </div>
+
+        <main className="main-content">
+          {tab === 'dashboard' && <Dashboard {...pageProps} />}
+          {tab === 'children' && <Children {...pageProps} />}
+          {tab === 'attendance' && <Attendance {...pageProps} />}
+          {tab === 'teachers' && <Teachers {...pageProps} />}
+          {tab === 'fees' && <Fees {...pageProps} />}
+          {tab === 'subscriptions' && <Subscriptions {...pageProps} />}
+          {tab === 'programs' && <Programs {...pageProps} />}
+          {tab === 'reports' && <Reports {...pageProps} />}
+          {tab === 'backup' && <Backup kindergartenId={activeId} kindergartenName={activeKg?.name} />}
+          {tab === 'settings' && (
+            <Settings
+              kindergarten={activeKg}
+              onUpdated={() => loadKindergartens(session.user.id)}
+            />
+          )}
+        </main>
+
+        <nav className="mobile-bottomnav">
           {NAV.map((n) => (
-            <button key={n.id} onClick={() => setTab(n.id)} className={`sidebar-link ${tab === n.id ? 'active' : ''}`}>
-              <span>{n.icon}</span> {n.label}
+            <button key={n.id} onClick={() => setTab(n.id)} className={`mobile-nav-item ${tab === n.id ? 'active' : ''}`}>
+              <span className="mobile-nav-icon">{n.icon}</span>
+              <span className="mobile-nav-label">{n.label}</span>
             </button>
           ))}
         </nav>
 
-        <button onClick={() => supabase.auth.signOut()} className="sidebar-logout">تسجيل الخروج</button>
-      </aside>
-
-      <div className="mobile-topbar">
-        <button onClick={() => setKgModalOpen(true)} className="mobile-kg-btn">
-          🏫 {activeKg?.name}
-        </button>
-        <button onClick={() => supabase.auth.signOut()} className="mobile-logout-btn">خروج</button>
-      </div>
-
-      <main className="main-content">
-        {tab === 'dashboard' && <Dashboard {...pageProps} />}
-        {tab === 'children' && <Children {...pageProps} />}
-        {tab === 'attendance' && <Attendance {...pageProps} />}
-        {tab === 'teachers' && <Teachers {...pageProps} />}
-        {tab === 'fees' && <Fees {...pageProps} />}
-        {tab === 'subscriptions' && <Subscriptions {...pageProps} />}
-        {tab === 'programs' && <Programs {...pageProps} />}
-        {tab === 'reports' && <Reports {...pageProps} />}
-        {tab === 'backup' && <Backup kindergartenId={activeId} kindergartenName={activeKg?.name} />}
-        {tab === 'settings' && (
-          <Settings
-            kindergarten={activeKg}
-            onUpdated={() => loadKindergartens(session.user.id)}
+        {kgModalOpen && (
+          <KindergartenModal
+            kindergartens={kindergartens}
+            activeId={activeId}
+            userId={session.user.id}
+            onClose={() => setKgModalOpen(false)}
+            onSwitch={(id) => { setActiveId(id); setKgModalOpen(false) }}
+            onChanged={() => loadKindergartens(session.user.id)}
           />
         )}
-      </main>
-
-      <nav className="mobile-bottomnav">
-        {NAV.map((n) => (
-          <button key={n.id} onClick={() => setTab(n.id)} className={`mobile-nav-item ${tab === n.id ? 'active' : ''}`}>
-            <span className="mobile-nav-icon">{n.icon}</span>
-            <span className="mobile-nav-label">{n.label}</span>
-          </button>
-        ))}
-      </nav>
-
-      {kgModalOpen && (
-        <KindergartenModal
-          kindergartens={kindergartens}
-          activeId={activeId}
-          userId={session.user.id}
-          onClose={() => setKgModalOpen(false)}
-          onSwitch={(id) => { setActiveId(id); setKgModalOpen(false) }}
-          onChanged={() => loadKindergartens(session.user.id)}
-        />
-      )}
+      </div>
     </div>
   )
 }
