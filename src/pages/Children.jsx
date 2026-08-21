@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { allLevels, levelInfo, todayISO, thisMonth } from '../levels'
+import { allLevels, levelInfo, todayISO } from '../levels'
 
 const REGISTRATION_PERIODS = {
   monthly: 'شهري',
@@ -25,12 +25,17 @@ const DISMISSAL_TIMES = {
   '4': 'الرابعة',
 }
 
+const SEMESTER_NUMBERS = {
+  '1': 'الفصل الدراسي الأول',
+  '2': 'الفصل الدراسي الثاني',
+}
+
 function emptyChild() {
   return {
     name: '', level: '', parent_name: '', phone: '', birth_date: '',
-    join_date: '', notes: '',
+    join_date: '', fee_start_date: '', notes: '',
     registration_period: '', registration_type: '', dismissal_time: '',
-    bus_type: '',
+    semester_number: '', bus_type: '',
   }
 }
 
@@ -66,11 +71,13 @@ export default function Children({ kindergartenId, levelNames }) {
       phone: form.phone,
       birth_date: form.birth_date || null,
       join_date: form.join_date || null,
+      fee_start_date: form.fee_start_date || null,
       notes: form.notes,
       kindergarten_id: kindergartenId,
       registration_period: form.registration_period,
       registration_type: form.registration_period === 'monthly' ? form.registration_type : null,
-      dismissal_time: form.registration_period === 'monthly' ? form.dismissal_time : null,
+      dismissal_time: form.dismissal_time || null,
+      semester_number: form.registration_period === 'semester' ? form.semester_number : null,
       bus_type: form.bus_type,
     }
 
@@ -84,14 +91,17 @@ export default function Children({ kindergartenId, levelNames }) {
       childId = data.id
     }
 
+    const billingMonth = (form.fee_start_date || todayISO()).slice(0, 7)
+
     try {
       await supabase.rpc('register_child_fee', {
         p_child_id: childId,
         p_kindergarten_id: kindergartenId,
         p_registration_period: form.registration_period,
-        p_dismissal_time: form.registration_period === 'monthly' ? form.dismissal_time : null,
+        p_dismissal_time: form.dismissal_time || null,
         p_bus_type: form.bus_type,
-        p_month: thisMonth(),
+        p_month: billingMonth,
+        p_semester_number: form.registration_period === 'semester' ? form.semester_number : null,
       })
     } catch (e) {
       console.error('register_child_fee failed', e)
@@ -177,8 +187,10 @@ export default function Children({ kindergartenId, levelNames }) {
                   <span>
                     مدة التسجيل: {REGISTRATION_PERIODS[c.registration_period] || '—'}
                     {c.registration_period === 'monthly' && c.registration_type ? ` · ${REGISTRATION_TYPES[c.registration_type]}` : ''}
-                    {c.registration_period === 'monthly' && c.dismissal_time ? ` · انصراف ${DISMISSAL_TIMES[c.dismissal_time]}` : ''}
+                    {c.registration_period === 'semester' && c.semester_number ? ` · ${SEMESTER_NUMBERS[c.semester_number]}` : ''}
+                    {c.dismissal_time ? ` · انصراف ${DISMISSAL_TIMES[c.dismissal_time]}` : ''}
                   </span>
+                  <span>بداية حساب الرسوم: {c.fee_start_date || '—'}</span>
                   <span>الحافلة: {BUS_TYPES[c.bus_type] || '—'}</span>
                 </div>
               </div>
@@ -250,10 +262,12 @@ function ChildForm({ child, levels, onCancel, onSave }) {
     if (!form.parent_name || !form.parent_name.trim()) newErrors.parent_name = 'اسم ولي الأمر مطلوب'
     if (!form.phone || !form.phone.trim()) newErrors.phone = 'رقم الجوال مطلوب'
     if (!form.birth_date) newErrors.birth_date = 'تاريخ الميلاد مطلوب'
-    if (!form.join_date) newErrors.join_date = 'تاريخ الالتحاق مطلوب'
+    if (!form.join_date) newErrors.join_date = 'تاريخ التسجيل مطلوب'
+    if (!form.fee_start_date) newErrors.fee_start_date = 'تاريخ بداية حساب الرسوم مطلوب'
     if (!form.registration_period) newErrors.registration_period = 'مدة التسجيل مطلوبة'
     if (form.registration_period === 'monthly' && !form.registration_type) newErrors.registration_type = 'نوع التسجيل مطلوب'
-    if (form.registration_period === 'monthly' && !form.dismissal_time) newErrors.dismissal_time = 'وقت الانصراف مطلوب'
+    if (form.registration_period === 'semester' && !form.semester_number) newErrors.semester_number = 'الفصل الدراسي مطلوب'
+    if (form.registration_period && !form.dismissal_time) newErrors.dismissal_time = 'وقت الانصراف مطلوب'
     if (!form.bus_type) newErrors.bus_type = 'الحافلة مطلوبة'
 
     if (Object.keys(newErrors).length > 0) {
@@ -300,8 +314,12 @@ function ChildForm({ child, levels, onCancel, onSave }) {
 
         <div style={{ gridColumn: '1 / -1', height: 1, background: 'var(--line)', margin: '4px 0' }} />
 
-        <Field label="تاريخ الالتحاق" error={errors.join_date}>
+        <Field label="تاريخ التسجيل" error={errors.join_date}>
           <input className="input" type="date" value={form.join_date || ''} onChange={set('join_date')} style={inputStyle('join_date')} />
+        </Field>
+
+        <Field label="تاريخ بداية حساب الرسوم" hint="من هذا التاريخ تُحتسب رسوم الطفل" error={errors.fee_start_date}>
+          <input className="input" type="date" value={form.fee_start_date || ''} onChange={set('fee_start_date')} style={inputStyle('fee_start_date')} />
         </Field>
 
         <Field label="مدة التسجيل" error={errors.registration_period}>
@@ -314,25 +332,36 @@ function ChildForm({ child, levels, onCancel, onSave }) {
         </Field>
 
         {form.registration_period === 'monthly' && (
-          <>
-            <Field label="نوع التسجيل (شخصي / قرة)" error={errors.registration_type}>
-              <select className="input" value={form.registration_type} onChange={set('registration_type')} style={inputStyle('registration_type')}>
-                <option value="">-- اختر --</option>
-                {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </Field>
+          <Field label="نوع التسجيل (شخصي / قرة)" error={errors.registration_type}>
+            <select className="input" value={form.registration_type} onChange={set('registration_type')} style={inputStyle('registration_type')}>
+              <option value="">-- اختر --</option>
+              {Object.entries(REGISTRATION_TYPES).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </Field>
+        )}
 
-            <Field label="وقت الانصراف" error={errors.dismissal_time}>
-              <select className="input" value={form.dismissal_time} onChange={set('dismissal_time')} style={inputStyle('dismissal_time')}>
-                <option value="">-- اختر --</option>
-                {Object.entries(DISMISSAL_TIMES).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </Field>
-          </>
+        {form.registration_period === 'semester' && (
+          <Field label="الفصل الدراسي" error={errors.semester_number}>
+            <select className="input" value={form.semester_number} onChange={set('semester_number')} style={inputStyle('semester_number')}>
+              <option value="">-- اختر --</option>
+              {Object.entries(SEMESTER_NUMBERS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        {form.registration_period && (
+          <Field label="وقت الانصراف" error={errors.dismissal_time}>
+            <select className="input" value={form.dismissal_time} onChange={set('dismissal_time')} style={inputStyle('dismissal_time')}>
+              <option value="">-- اختر --</option>
+              {Object.entries(DISMISSAL_TIMES).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </Field>
         )}
 
         <Field label="الحافلة" error={errors.bus_type}>
